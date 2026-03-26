@@ -917,7 +917,7 @@ document.getElementById('importFile').addEventListener('change', function() {
 const panel=document.getElementById('panel'), hint=document.getElementById('hint');
 const spawnersPanel=document.getElementById('spawnersPanel');
 document.addEventListener('keydown', e=>{
-  if(e.key.toLowerCase()==='h'){ uiVisible=!uiVisible; panel.classList.toggle('hidden',!uiVisible); hint.classList.toggle('hidden',!uiVisible); spawnersPanel.classList.toggle('hidden',!uiVisible); }
+  if(e.key.toLowerCase()==='h'){ uiVisible=!uiVisible; panel.classList.toggle('hidden',!uiVisible); hint.classList.toggle('hidden',!uiVisible); spawnersPanel.classList.toggle('hidden',!uiVisible); sceneBar.style.display=uiVisible?'':'none'; }
   if(e.key.toLowerCase()==='m'){ bgVisible=!bgVisible; }
   if(e.key===' '){ btnPlay.click(); e.preventDefault(); }
   if(e.key==='f'||e.key==='F'){ fitView(); ctx.clearRect(0,0,W,H); }
