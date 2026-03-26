@@ -728,7 +728,7 @@ canvas.addEventListener('wheel', e => {
   saveConfig();
 }, { passive:false });
 
-let isPanning=false, panSX=0, panSY=0, panPX=0, panPY=0, dragIdx=-1, dragOffX=0, dragOffY=0;
+let isPanning=false, panSX=0, panSY=0, panPX=0, panPY=0;
 canvas.addEventListener('mousedown', e => {
   if (e.altKey || e.button===1) {
     isPanning=true; panSX=e.clientX; panSY=e.clientY; panPX=view.panX; panPY=view.panY;
