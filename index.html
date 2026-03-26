@@ -117,7 +117,7 @@
 
 <div id="spawnersPanel" class="hidden"></div>
 <div id="tooltip" class="hidden">CLICK to add · DRAG to move · RIGHT-CLICK to remove</div>
-<div id="hint" class="hidden">S — start · R — restart · Space — pause · V — record · L — lock color · H — hide UI · M — map</div>
+<div id="hint" class="hidden">S — start · R — restart · Space — pause · V — record · L — lock color · H — hide UI · M — map · scroll — zoom · alt+drag — pan</div>
 
 <script>
 const canvas = document.getElementById('canvas');
@@ -712,7 +712,59 @@ function loadAllScenes() {
 }
 
 
-canvas.style.cursor = 'default';
+// ─── Zoom / Pan ────────────────────────────────────────────────────────────
+function applyZoom(newScale, pivotSX, pivotSY) {
+  newScale = Math.max(0.1, Math.min(10, newScale));
+  view.panX = pivotSX - (pivotSX - view.panX) * (newScale / view.scale);
+  view.panY = pivotSY - (pivotSY - view.panY) * (newScale / view.scale);
+  view.scale = newScale;
+  viewDirty = true;
+}
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r=canvas.getBoundingClientRect();
+  applyZoom(view.scale * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX-r.left, e.clientY-r.top);
+  saveConfig();
+}, { passive:false });
+
+let isPanning=false, panSX=0, panSY=0, panPX=0, panPY=0, dragIdx=-1, dragOffX=0, dragOffY=0;
+canvas.addEventListener('mousedown', e => {
+  if (e.altKey || e.button===1) {
+    isPanning=true; panSX=e.clientX; panSY=e.clientY; panPX=view.panX; panPY=view.panY;
+    canvas.style.cursor='move'; e.preventDefault();
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (isPanning) { view.panX=panPX+(e.clientX-panSX); view.panY=panPY+(e.clientY-panSY); viewDirty=true; }
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (isPanning) { isPanning=false; saveConfig(); canvas.style.cursor='default'; }
+});
+
+let lastTouchDist=0, lastTouchMX=0, lastTouchMY=0;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length===2) {
+    lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const r=canvas.getBoundingClientRect();
+    lastTouchMX=(e.touches[0].clientX+e.touches[1].clientX)/2-r.left;
+    lastTouchMY=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top;
+  }
+},{passive:false});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length===2) {
+    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const r=canvas.getBoundingClientRect();
+    const mx=(e.touches[0].clientX+e.touches[1].clientX)/2-r.left, my=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top;
+    if (lastTouchDist) applyZoom(view.scale*(dist/lastTouchDist),mx,my);
+    view.panX+=mx-lastTouchMX; view.panY+=my-lastTouchMY; viewDirty=true;
+    lastTouchDist=dist; lastTouchMX=mx; lastTouchMY=my;
+  }
+},{passive:false});
+canvas.addEventListener('touchend',()=>{ lastTouchDist=0; });
 
 // ─── Controls ──────────────────────────────────────────────────────────────
 function wire(id, valId, param, fmt) {
