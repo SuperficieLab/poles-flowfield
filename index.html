@@ -5,8 +5,8 @@
   <title>Flow Field</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#000000; overflow:hidden; font-family:'SF Mono','Fira Mono',monospace; }
-    canvas { display:block; }
+    body { background:#000000; overflow:hidden; font-family:'SF Mono','Fira Mono',monospace; display:flex; align-items:center; justify-content:center; width:100vw; height:100vh; }
+    canvas { display:block; flex-shrink:0; }
 
 
     #panel {
@@ -86,8 +86,6 @@
   <div class="ctrl"><label>Size</label>     <input type="range" id="sSize"   min="0.1"  max="0.7"  step="0.05" value="0.7"> <span class="val" id="vSize">0.7</span></div>
 <div class="ctrl"><label>Noise</label>    <input type="range" id="sNoise"  min="0"    max="2"    step="0.05" value="0.3"> <span class="val" id="vNoise">0.30</span></div>
   <div class="divider"></div>
-  <div class="ctrl"><label>Zoom</label>     <input type="range" id="sZoom"   min="0.1"  max="5"    step="0.05" value="1">  <span class="val" id="vZoom">1.00×</span></div>
-  <button class="btn" id="btnFit"   title="Fit to screen (F)">⊞</button>
   <div class="divider"></div>
   <div class="ctrl">
     <label>Colors</label>
@@ -118,7 +116,7 @@
 
 <div id="spawnersPanel" class="hidden"></div>
 <div id="tooltip" class="hidden">CLICK to add · DRAG to move · RIGHT-CLICK to remove</div>
-<div id="hint" class="hidden">S — start · R — restart · Space — pause · V — record · F — fit · L — lock color · H — hide UI · M — map · scroll — zoom · alt+drag — pan</div>
+<div id="hint" class="hidden">S — start · R — restart · Space — pause · V — record · L — lock color · H — hide UI · M — map</div>
 
 <script>
 const canvas = document.getElementById('canvas');
@@ -133,17 +131,8 @@ let SVG_W = 1920, SVG_H = 1080;
 const view = { scale:1, panX:0, panY:0 };
 let viewDirty = false;
 
-function s2w(sx, sy) { return { x:(sx-view.panX)/view.scale, y:(sy-view.panY)/view.scale }; }
+function s2w(sx, sy) { const r=canvas.getBoundingClientRect(); return { x:(sx-r.left-view.panX)/view.scale, y:(sy-r.top-view.panY)/view.scale }; }
 
-function applyZoom(newScale, pivotSX, pivotSY) {
-  newScale = Math.max(0.1, Math.min(10, newScale));
-  view.panX = pivotSX - (pivotSX - view.panX) * (newScale / view.scale);
-  view.panY = pivotSY - (pivotSY - view.panY) * (newScale / view.scale);
-  view.scale = newScale;
-  viewDirty = true;
-  document.getElementById('sZoom').value = Math.min(5, Math.max(0.1, newScale));
-  document.getElementById('vZoom').textContent = newScale.toFixed(2) + '×';
-}
 
 // ─── Params ────────────────────────────────────────────────────────────────
 const P = { count:1000, speed:0.6, fade:0.18, spread:30, size:0.7, color:'#ffe020',
@@ -215,8 +204,6 @@ function applyConfigSliders(cfg) {
   }
   if (cfg.viewScale!=null) {
     view.scale=cfg.viewScale; view.panX=cfg.viewPanX; view.panY=cfg.viewPanY;
-    document.getElementById('sZoom').value=Math.min(5,Math.max(0.1,view.scale));
-    document.getElementById('vZoom').textContent=view.scale.toFixed(2)+'×';
   }
   if (cfg.bgVisible!=null) bgVisible=cfg.bgVisible;
   if (cfg.todosMode!=null) todosMode=cfg.todosMode;
@@ -441,8 +428,6 @@ function fitView() {
   view.panX  = (W - pw*s)/2 - x0*s;
   view.panY  = (H - ph*s)/2 - y0*s;
   viewDirty  = true;
-  document.getElementById('sZoom').value = Math.min(5, Math.max(0.1, s));
-  document.getElementById('vZoom').textContent = s.toFixed(2)+'×';
 }
 
 
@@ -683,8 +668,6 @@ function applySegments(segs, w, h, sceneMap) {
   const _savedCfg=loadConfig();
   if (_savedCfg && _savedCfg.viewScale!=null) {
     view.scale=_savedCfg.viewScale; view.panX=_savedCfg.viewPanX; view.panY=_savedCfg.viewPanY;
-    document.getElementById('sZoom').value=Math.min(5,Math.max(0.1,view.scale));
-    document.getElementById('vZoom').textContent=view.scale.toFixed(2)+'×';
   } else { fitView(); }
   allTriggered = false;
   segActive = segments.map(() => false);
@@ -728,80 +711,7 @@ function loadAllScenes() {
 }
 
 
-// ─── Zoom / Pan ────────────────────────────────────────────────────────────
-canvas.addEventListener('wheel', e => {
-  e.preventDefault();
-  applyZoom(view.scale * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
-  saveConfig();
-}, { passive:false });
-
-document.getElementById('sZoom').addEventListener('input', function() {
-  applyZoom(parseFloat(this.value), W/2, H/2);
-  saveConfig();
-});
-
-let isPanning=false, panSX=0, panSY=0, panPX=0, panPY=0;
-canvas.addEventListener('mousedown', e => {
-  if (e.altKey || e.button===1) {
-    isPanning=true; panSX=e.clientX; panSY=e.clientY; panPX=view.panX; panPY=view.panY;
-    canvas.style.cursor='move'; e.preventDefault(); return;
-  }
-  if (P.mode!=='point' || e.target!==canvas) return;
-  const {x:wx, y:wy} = s2w(e.clientX, e.clientY);
-  const hit = nearestEmitter(e.clientX, e.clientY);
-  if (hit>=0) { dragIdx=hit; dragOffX=emitters[hit].x-wx; dragOffY=emitters[hit].y-wy; }
-  else { emitters.push({x:wx, y:wy}); dragIdx=emitters.length-1; dragOffX=0; dragOffY=0; }
-  canvas.style.cursor='grabbing';
-});
-
-canvas.addEventListener('mousemove', e => {
-  if (isPanning) { view.panX=panPX+(e.clientX-panSX); view.panY=panPY+(e.clientY-panSY); viewDirty=true; return; }
-  if (P.mode!=='point') { canvas.style.cursor='default'; return; }
-  if (dragIdx>=0) { const {x:wx,y:wy}=s2w(e.clientX,e.clientY); emitters[dragIdx].x=wx+dragOffX; emitters[dragIdx].y=wy+dragOffY; }
-  else canvas.style.cursor = nearestEmitter(e.clientX,e.clientY)>=0 ? 'grab' : 'crosshair';
-});
-
-canvas.addEventListener('mouseup', () => {
-  if (isPanning) { isPanning=false; saveConfig(); }
-  dragIdx=-1;
-  canvas.style.cursor=P.mode==='point'?'crosshair':'default';
-});
-
-canvas.addEventListener('contextmenu', e => {
-  if (P.mode!=='point') return; e.preventDefault();
-  const hit=nearestEmitter(e.clientX,e.clientY);
-  if (hit>=0&&emitters.length>1) emitters.splice(hit,1);
-});
-
-let lastTouchDist=0, lastTouchMX=0, lastTouchMY=0;
-canvas.addEventListener('touchstart', e => {
-  if (P.mode==='point'&&e.touches.length===1) {
-    e.preventDefault();
-    const t=e.touches[0], {x:wx,y:wy}=s2w(t.clientX,t.clientY);
-    const hit=nearestEmitter(t.clientX,t.clientY);
-    if (hit>=0){dragIdx=hit;dragOffX=emitters[hit].x-wx;dragOffY=emitters[hit].y-wy;}
-    else{emitters.push({x:wx,y:wy});dragIdx=emitters.length-1;dragOffX=0;dragOffY=0;}
-  }
-  if (e.touches.length===2) {
-    lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-    lastTouchMX=(e.touches[0].clientX+e.touches[1].clientX)/2;
-    lastTouchMY=(e.touches[0].clientY+e.touches[1].clientY)/2;
-  }
-},{passive:false});
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  if (e.touches.length===2) {
-    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-    const mx=(e.touches[0].clientX+e.touches[1].clientX)/2, my=(e.touches[0].clientY+e.touches[1].clientY)/2;
-    if (lastTouchDist) applyZoom(view.scale*(dist/lastTouchDist),mx,my);
-    view.panX+=mx-lastTouchMX; view.panY+=my-lastTouchMY; viewDirty=true;
-    lastTouchDist=dist; lastTouchMX=mx; lastTouchMY=my;
-  } else if (e.touches.length===1&&dragIdx>=0&&P.mode==='point') {
-    const t=e.touches[0], {x:wx,y:wy}=s2w(t.clientX,t.clientY);
-    emitters[dragIdx].x=wx+dragOffX; emitters[dragIdx].y=wy+dragOffY;
-  }
-},{passive:false});
-canvas.addEventListener('touchend',()=>{ dragIdx=-1; lastTouchDist=0; });
+canvas.style.cursor = 'default';
 
 // ─── Controls ──────────────────────────────────────────────────────────────
 function wire(id, valId, param, fmt) {
@@ -836,7 +746,6 @@ btnPlay.addEventListener('click',()=>{
 const btnTrails=document.getElementById('btnTrails');
 btnTrails.addEventListener('click',()=>{ P.trails=!P.trails; btnTrails.classList.toggle('active',P.trails); if(!P.trails){ ctx.clearRect(0,0,W,H); trailCtx.clearRect(0,0,W,H); } });
 
-document.getElementById('btnFit').addEventListener('click', ()=>{ fitView(); ctx.clearRect(0,0,W,H); trailCtx.clearRect(0,0,W,H); });
 
 document.getElementById('sBgOp').addEventListener('input', function(){
   bgOpacity=parseFloat(this.value);
@@ -928,7 +837,6 @@ document.addEventListener('keydown', e=>{
   if(e.key.toLowerCase()==='h'){ uiVisible=!uiVisible; panel.classList.toggle('hidden',!uiVisible); hint.classList.toggle('hidden',!uiVisible); spawnersPanel.classList.toggle('hidden',!uiVisible); sceneBar.style.display=uiVisible?'':'none'; }
   if(e.key.toLowerCase()==='m'){ bgVisible=!bgVisible; }
   if(e.key===' '){ btnPlay.click(); e.preventDefault(); }
-  if(e.key==='f'||e.key==='F'){ fitView(); ctx.clearRect(0,0,W,H); }
   if(e.key==='s'||e.key==='S'){ if(segments.length){ P.paused=false; btnPlay.textContent='⏸'; btnPlay.classList.add('active'); triggerAll(); } }
   if(e.key==='r'||e.key==='R'){ if(segments.length){ doReset(); P.paused=false; btnPlay.textContent='⏸'; btnPlay.classList.add('active'); triggerAll(); } }
   if(e.key==='v'||e.key==='V'){ btnRecord.click(); }
