@@ -31,9 +31,10 @@
     .btn:hover  { background:rgba(255,224,32,0.12); color:#ffe020; }
     .btn.active { background:rgba(255,224,32,0.18); color:#ffe020; }
     #spawnersPanel {
-      position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
-      display:flex; gap:8px; flex-wrap:wrap; justify-content:center; max-width:90%;
+      position:fixed; bottom:120px; left:50%; transform:translateX(-50%);
+      display:flex; gap:10px; flex-wrap:wrap; justify-content:center; max-width:90%;
       transition:opacity 0.3s;
+      padding-bottom:8px;
     }
     #spawnersPanel.hidden { opacity:0; pointer-events:none; }
     .spawn-row { display:flex; align-items:center; gap:6px; height:28px; padding:0 18px; border:1px solid rgba(255,224,32,0.25); border-radius:20px; }
