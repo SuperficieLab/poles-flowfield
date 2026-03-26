@@ -189,9 +189,11 @@ function saveConfig() {
   localStorage.setItem('ff-config', JSON.stringify(buildConfigObject()));
 }
 
+const DEFAULT_CONFIG = {"count":6000,"speed":0.6,"fade":0.19,"spread":25,"size":0.7,"noise":0.65,"color":"#ffe020","sceneColors":{"Pacifico.svg":"#ff1f1f","Continental.svg":"#ffdd00","Costeiro.svg":"#40c8ff"},"guide":false,"trails":true,"bgOpacity":1,"bgVisible":false,"viewScale":0.8133727168253543,"viewPanX":174.76878895814332,"viewPanY":87.21988038104735,"scene":"Costeiro.svg","todosMode":true,"delays":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]};
+
 function loadConfig() {
-  try { const r=localStorage.getItem('ff-config'); return r ? JSON.parse(r) : null; }
-  catch(e) { return null; }
+  try { const r=localStorage.getItem('ff-config'); return r ? JSON.parse(r) : DEFAULT_CONFIG; }
+  catch(e) { return DEFAULT_CONFIG; }
 }
 
 function applyConfigSliders(cfg) {
