@@ -3,3 +3,6 @@ videos/
 .claude/
 points.json
 trail.svg
+record-test.js
+package.json
+package-lock.json
