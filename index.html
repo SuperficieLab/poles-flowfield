@@ -112,6 +112,7 @@
   <button class="btn" id="btnReset"     title="Reset (pause + clear)">↺</button>
   <button class="btn" id="btnExport"    title="Export config JSON">⬇</button>
   <button class="btn" id="btnImport"    title="Import config JSON">⬆</button>
+  <button class="btn" id="btnDefaults"  title="Reset to defaults">⌂</button>
   <input type="file" id="importFile" accept=".json,application/json" style="display:none">
 </div>
 
@@ -122,8 +123,8 @@
 <script>
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
-let W = canvas.width  = window.innerWidth;
-let H = canvas.height = window.innerHeight;
+let W = canvas.width  = Math.min(window.innerWidth,  1920);
+let H = canvas.height = Math.min(window.innerHeight, 1080);
 
 // SVG source dimensions — updated per-file from viewBox
 let SVG_W = 1920, SVG_H = 1080;
@@ -895,6 +896,11 @@ document.getElementById('btnImport').addEventListener('click',()=>{
   document.getElementById('importFile').click();
 });
 
+document.getElementById('btnDefaults').addEventListener('click',()=>{
+  localStorage.removeItem('ff-config');
+  location.reload();
+});
+
 document.getElementById('importFile').addEventListener('change', function() {
   const file = this.files[0]; if (!file) return;
   const reader = new FileReader();
@@ -987,8 +993,9 @@ function set4K() {
   window._autoexport = p.get('export'); // filename
 })();
 
-// Auto-load default scene
-const _startScene = window._autoScene || 'Pacifico.svg';
+// Auto-load default scene — prefer URL param, then saved/default config, then Pacifico
+const _cfgScene = (()=>{ const c=loadConfig(); if(!c) return null; if(c.todosMode) return 'todos'; return c.scene||null; })();
+const _startScene = window._autoScene || _cfgScene || 'Pacifico.svg';
 if (_startScene === 'todos') {
   loadAllScenes();
   setTimeout(()=>{
@@ -1012,7 +1019,7 @@ if (window._autoScene) {
 }
 
 window.addEventListener('resize',()=>{
-  W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight;
+  W=canvas.width=Math.min(window.innerWidth,1920); H=canvas.height=Math.min(window.innerHeight,1080);
   trailCanvas.width=W; trailCanvas.height=H;
   if (bgW===0) initBg();
   buildField(); loadConfigPaths(); fitView();
