@@ -85,7 +85,8 @@
   <a class="mode-link" href="index.html?scene=pacifico">flow</a>
   <div class="top-sep"></div>
   <button class="mode-link"        id="btnHeat"    title="Heat mode">heat</button>
-  <button class="mode-link active" id="btnContour" title="Contour mode">contour</button>
+  <button class="mode-link"        id="btnContour" title="Contour mode">contour</button>
+  <button class="mode-link active" id="btnMixed"   title="Mixed mode">mixed</button>
   <button class="mode-link"        id="btnDebug"   title="Debug: raw points">points</button>
   <div class="top-sep"></div>
   <button class="load-btn" id="btnLoad">+ load csv</button>
@@ -102,7 +103,11 @@
   <div class="divider"></div>
   <div class="ctrl"><label>Radius</label>   <input type="range" id="sRadius"    min="5"   max="120"  step="1"    value="15">  <span class="val" id="vRadius">15</span></div>
   <div class="ctrl"><label>Intensity</label><input type="range" id="sIntensity" min="0.1" max="5.0"  step="0.1"  value="1.5"> <span class="val" id="vIntensity">1.5</span></div>
-  <div class="ctrl"><label>Speed</label>    <input type="range" id="sSpeed"     min="0.1" max="3.0"  step="0.1"  value="1.0"> <span class="val" id="vSpeed">1.0×</span></div>
+  <div class="ctrl"><label>Speed</label>    <input type="range" id="sSpeed"     min="0.1" max="3.0"  step="0.1"  value="1.5"> <span class="val" id="vSpeed">1.5×</span></div>
+  <div class="ctrl"><label>Heat α</label>   <input type="range" id="sAlphaHeat"    min="0"   max="1"   step="0.05" value="0.85"> <span class="val" id="vAlphaHeat">85%</span></div>
+  <div class="ctrl"><label>Heat band</label><input type="range" id="sBandHeat"     min="5"   max="150" step="5"    value="45">  <span class="val" id="vBandHeat">45</span></div>
+  <div class="ctrl"><label>Ctr α</label>   <input type="range" id="sAlphaContour" min="0"   max="1"   step="0.05" value="0.20"> <span class="val" id="vAlphaContour">20%</span></div>
+  <div class="ctrl"><label>Ctr band</label><input type="range" id="sBandContour"   min="0.2" max="4"   step="0.1"  value="0.8"> <span class="val" id="vBandContour">0.8</span></div>
   <div class="ctrl"><label>Bg</label>       <input type="range" id="sBgOp"      min="0"   max="1"    step="0.05" value="1.0"> <span class="val" id="vBgOp">100%</span></div>
   <div class="divider"></div>
   <button class="btn" id="btnRecord"   title="Record (V)">&#x23FA;</button>
@@ -251,10 +256,10 @@ const thermalPal = new Uint8ClampedArray(256*4);
     [0,   [0,  0,   0,   0  ]],
     [25,  [0,  0,   100, 100]],
     [70,  [0,  40,  200, 180]],
-    [120, [0,  180, 180, 220]],
-    [160, [80, 220, 60,  240]],
-    [190, [220,220, 0,   250]],
-    [215, [255,100, 0,   255]],
+    [125, [0,  180, 180, 220]],
+    [170, [80, 220, 60,  240]],
+    [210, [220,220, 0,   250]],
+    [238, [255,100, 0,   255]],
     [255, [255,20,  20,  255]],
   ];
   for (let v=0;v<256;v++) {
@@ -270,14 +275,14 @@ const thermalPal = new Uint8ClampedArray(256*4);
   }
 })();
 
-let renderMode = 'contour'; // 'heat' | 'contour' | 'debug'
+let renderMode = 'mixed'; // 'heat' | 'contour' | 'mixed' | 'debug'
 
 // ─── Params ──────────────────────────────────────────────────────────────────
-const P = { radius:15, intensity:1.5, speed:1.0 };
+const P = { radius:15, intensity:1.5, speed:1.5, alphaHeat:0.85, alphaContour:0.20, bandHeat:45, bandContour:0.8 };
 
 // Rebuild the heat grid from current dataset weights
 function rebuildHeat() {
-  heatGrid.fill(0); heatColorR.fill(0); heatColorG.fill(0); heatColorB.fill(0);
+  heatGrid.fill(0);
   const r = Math.ceil(P.radius * HW / W); // radius in grid cells
 
   for (const ds of datasets) {
@@ -305,30 +310,29 @@ function rebuildHeat() {
           const falloff = Math.exp(-2.5 * (dist*dist) / (r*r)) * w * pulse * P.intensity;
           const idx = nhy*HW+nhx;
           heatGrid[idx]   += falloff;
-          heatColorR[idx] += cr * falloff;
-          heatColorG[idx] += cg * falloff;
-          heatColorB[idx] += cb * falloff;
         }
       }
     }
   }
   // Smooth the density grid before colorizing so blobs blend cleanly
-  boxBlur(heatGrid,   HW, HH, 8);
-  boxBlur(heatColorR, HW, HH, 8);
-  boxBlur(heatColorG, HW, HH, 8);
-  boxBlur(heatColorB, HW, HH, 8);
+  boxBlur(heatGrid, HW, HH, 8);
 }
 
 function renderHeatmap() {
-  if (renderMode === 'contour') renderContour();
-  else renderThermal();
+  if (renderMode === 'contour' || renderMode === 'mixed') renderContour();
+  if (renderMode === 'heat'    || renderMode === 'mixed') renderThermal();
 }
+
+// Precomputed gamma LUT: maps linear 0–255 → palette index with power curve 0.38
+// Avoids per-pixel Math.pow in the render loop.
+const THERMAL_LUT = new Uint8Array(256);
+(function(){ for (let i=0;i<256;i++) THERMAL_LUT[i] = Math.pow(i/255, 0.38) * 255 | 0; })();
 
 function renderThermal() {
   const d = heatImg.data;
-  const scale = 45;
+  const scale = P.bandHeat;
   for (let i=0;i<HW*HH;i++) {
-    const v = Math.min(255, heatGrid[i]*scale)|0;
+    const v = THERMAL_LUT[Math.min(255, heatGrid[i] * scale | 0)];
     d[i*4+0]=thermalPal[v*4+0];
     d[i*4+1]=thermalPal[v*4+1];
     d[i*4+2]=thermalPal[v*4+2];
@@ -338,17 +342,20 @@ function renderThermal() {
 }
 
 // Depth/topo map contour renderer
-const CONTOUR_LEVELS = [0.40, 2.00];
+const CONTOUR_LEVELS = [0.20, 0.65, 1.40, 2.60];
 
-// Filled elevation bands — transparent at low density, solid at high density
+// Filled elevation bands — very subtle fills, almost invisible per step
+// so band boundaries are imperceptible and colors accumulate gently toward center
 const CONTOUR_BAND_FILLS = [
-  null,                      // below all levels — transparent
-  [215, 205, 182,   0],     // band 0→1 — fully transparent
-  [148, 102,  58, 148],     // above 1  — most opaque
+  null,                        // below all levels — fully transparent
+  [210, 198, 172,  16],       // 0.20–0.65
+  [198, 178, 140,  28],       // 0.65–1.40
+  [178, 145,  95,  40],       // 1.40–2.60
+  [152, 108,  50,  52],       // above 2.60
 ];
 
-// Single dark sepia color for all contour lines (classic topo style)
-const CONTOUR_LINE_COLOR = [62, 42, 24, 215];
+// Warm yellow — sits in the thermal palette's mid-high range
+const CONTOUR_LINE_COLOR = [255, 210, 55, 190];
 
 function renderContour() {
   if (contourImg.width !== W || contourImg.height !== H) {
@@ -386,10 +393,11 @@ function renderContour() {
 
   // Pass 2 — filled elevation bands + anti-aliased contour lines on top.
   const LINE_HALF = 1.2;
+
   for (let sy = y0; sy <= y1; sy++) {
     for (let sx = x0; sx <= x1; sx++) {
       const si = sy * W + sx;
-      const v  = contourGrid[si];
+      const v  = contourGrid[si] * P.bandContour;
 
       // Which elevation band is this pixel in?
       let band = 0;
@@ -398,21 +406,22 @@ function renderContour() {
       }
 
       let r = 0, g = 0, b = 0, a = 0;
-      const fill = CONTOUR_BAND_FILLS[band];
-      if (fill) { r = fill[0]; g = fill[1]; b = fill[2]; a = fill[3]; }
 
-      // Anti-aliased line: find closest level crossing in pixel space
-      const dx   = (contourGrid[si + 1] - contourGrid[si - 1]) * 0.5;
-      const dy   = (contourGrid[si + W] - contourGrid[si - W]) * 0.5;
-      const grad = Math.sqrt(dx * dx + dy * dy);
-      if (grad >= 1e-4) {
-        let minDist = LINE_HALF;
+      // Anti-aliased line: avoid sqrt on every pixel — compare squared distances,
+      // only call sqrt on the few pixels that actually land on a line.
+      const dx     = (contourGrid[si + 1] - contourGrid[si - 1]) * 0.5;
+      const dy     = (contourGrid[si + W] - contourGrid[si - W]) * 0.5;
+      const gradSq = dx * dx + dy * dy;
+      if (gradSq >= 1e-8) {
+        const LH2 = LINE_HALF * LINE_HALF;
+        let minPdSq = LH2;
         for (let li = 0; li < CONTOUR_LEVELS.length; li++) {
-          const pd = Math.abs(v - CONTOUR_LEVELS[li]) / grad;
-          if (pd < minDist) minDist = pd;
+          const diff = v - CONTOUR_LEVELS[li];
+          const pdSq = (diff * diff) / gradSq;
+          if (pdSq < minPdSq) minPdSq = pdSq;
         }
-        if (minDist < LINE_HALF) {
-          const t  = 1 - minDist / LINE_HALF;
+        if (minPdSq < LH2) {
+          const t  = 1 - Math.sqrt(minPdSq) / LINE_HALF;
           const lc = CONTOUR_LINE_COLOR;
           r = (r + (lc[0] - r) * t) | 0;
           g = (g + (lc[1] - g) * t) | 0;
@@ -551,13 +560,15 @@ function loop() {
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
   if (bgW) {
     if (renderMode === 'contour') {
-      ctx.drawImage(contourCanvas, 0, 0); // 1:1, no scaling
+      ctx.save(); ctx.globalAlpha = P.alphaContour; ctx.drawImage(contourCanvas, 0, 0); ctx.restore();
     } else if (renderMode === 'heat') {
-      ctx.drawImage(heatCanvas, bgX, bgY, bgW, bgH);
+      ctx.save(); ctx.globalAlpha = P.alphaHeat; ctx.drawImage(heatCanvas, bgX, bgY, bgW, bgH); ctx.restore();
+    } else if (renderMode === 'mixed') {
+      ctx.save(); ctx.globalAlpha = P.alphaHeat;    ctx.drawImage(heatCanvas, bgX, bgY, bgW, bgH); ctx.restore();
+      ctx.save(); ctx.globalAlpha = P.alphaContour; ctx.drawImage(contourCanvas, 0, 0); ctx.restore();
     }
   }
   if (renderMode === 'debug') drawSiteDots();
-  else if (renderMode !== 'contour') drawRipples();
 
   requestAnimationFrame(loop);
 }
@@ -753,6 +764,24 @@ wire('sRadius',    'vRadius',    'radius',    v=>`${v}`);
 wire('sIntensity', 'vIntensity', 'intensity', v=>`${v.toFixed(1)}`);
 wire('sSpeed',     'vSpeed',     'speed',     v=>`${v.toFixed(1)}×`);
 
+document.getElementById('sAlphaHeat').addEventListener('input', function() {
+  P.alphaHeat=parseFloat(this.value);
+  document.getElementById('vAlphaHeat').textContent=Math.round(P.alphaHeat*100)+'%';
+});
+document.getElementById('sBandHeat').addEventListener('input', function() {
+  P.bandHeat=parseFloat(this.value);
+  document.getElementById('vBandHeat').textContent=P.bandHeat;
+  needsRebuild=true;
+});
+document.getElementById('sAlphaContour').addEventListener('input', function() {
+  P.alphaContour=parseFloat(this.value);
+  document.getElementById('vAlphaContour').textContent=Math.round(P.alphaContour*100)+'%';
+});
+document.getElementById('sBandContour').addEventListener('input', function() {
+  P.bandContour=parseFloat(this.value);
+  document.getElementById('vBandContour').textContent=P.bandContour.toFixed(1);
+  needsRebuild=true;
+});
 document.getElementById('sBgOp').addEventListener('input', function() {
   bgOpacity=parseFloat(this.value);
   document.getElementById('vBgOp').textContent=Math.round(bgOpacity*100)+'%';
@@ -763,16 +792,19 @@ document.getElementById('sBgOp').addEventListener('input', function() {
 // ─── Render mode toggle ───────────────────────────────────────────────────────
 const btnHeat    = document.getElementById('btnHeat');
 const btnContour = document.getElementById('btnContour');
+const btnMixed   = document.getElementById('btnMixed');
 const btnDebug   = document.getElementById('btnDebug');
 function setRenderMode(mode) {
   renderMode = mode;
   btnHeat.classList.toggle('active',    mode === 'heat');
   btnContour.classList.toggle('active', mode === 'contour');
+  btnMixed.classList.toggle('active',   mode === 'mixed');
   btnDebug.classList.toggle('active',   mode === 'debug');
   needsRebuild = true;
 }
 btnHeat.addEventListener('click',    () => setRenderMode('heat'));
 btnContour.addEventListener('click', () => setRenderMode('contour'));
+btnMixed.addEventListener('click',   () => setRenderMode('mixed'));
 btnDebug.addEventListener('click',   () => setRenderMode('debug'));
 
 // ─── Video recording ──────────────────────────────────────────────────────────
