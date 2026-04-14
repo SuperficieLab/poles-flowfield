@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camera Movements</title>
+  <link rel="stylesheet" href="camera-movements.css" />
+</head>
+<body>
+  <svg id="map"></svg>
+
+  <div id="sceneBar">
+    <button id="transitionBtn" class="scene-btn">transition</button>
+  </div>
+
+  <!-- D3 core + extended projections (Eckert III lives here, not in base d3) -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-geo-projection@4/dist/d3-geo-projection.min.js"></script>
+  <script src="camera-movements.js"></script>
+</body>
+</html>
