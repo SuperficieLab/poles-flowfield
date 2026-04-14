@@ -1,17 +1,17 @@
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  bgImage:      'BASE-MUNDO.jpg',
-  overlayImage: 'BASE-MUNDO RECORTE AFRICA.jpg',
+  bgImage:      'BASE_MUNDO.png',
+  overlayImage: 'BASE_AFRICA.png',
 
   // Geographic target of the zoom animation [longitude, latitude].
-  zoomTarget: [5, -10],
+  zoomTarget: [5, -8],
 
   // How far in the camera zooms during the animation.
-  zoomTargetScale: 1.4,
+  zoomTargetScale: 2.5,
 
   // Duration of the transition (camera move + crossfade), in ms.
-  transitionDuration: 1000,
+  transitionDuration: 1250,
 
   // Easing curve:
   // d3.easeCubicInOut  — slow start, fast middle, slow end (cinematic)
@@ -29,7 +29,24 @@ const CONFIG = {
   graticuleWidth: 0.5,
   outlineColor:   'rgba(255,255,255,0.4)',
   outlineWidth:   1,
+
+  transitionDelay: 90, // ms to wait before starting the crossfade (after camera starts moving) 
 };
+
+// ─── Preload images ──────────────────────────────────────────────────────────
+
+function preloadImage(src) {
+  const img = new Image();
+  img.src = src;
+  return img.decode().then(() => src);
+}
+
+Promise.all([
+  preloadImage(CONFIG.bgImage),
+  preloadImage(CONFIG.overlayImage),
+]).then(init).catch(console.error);
+
+function init() {
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +87,7 @@ g.append('image')
   .attr('preserveAspectRatio', 'none');
 
 // Second image — same size/position as base, starts invisible.
+// CSS transition (not D3 attr) so the crossfade runs on the compositor thread.
 g.append('image')
   .attr('id', 'overlay-image')
   .attr('clip-path', 'url(#sphere-clip)')
@@ -77,7 +95,9 @@ g.append('image')
   .attr('x', x0).attr('y', y0)
   .attr('width', imgW).attr('height', imgH)
   .attr('preserveAspectRatio', 'none')
-  .attr('opacity', 0);
+  .style('will-change', 'opacity')
+  .style('opacity', '0')
+  .style('transition', `opacity ${CONFIG.transitionDuration}ms cubic-bezier(0.645, 0.045, 0.355, 1)`);
 
 // ─── Zoom ────────────────────────────────────────────────────────────────────
 // filter(() => false) blocks all user interaction (scroll, drag, pinch) while
@@ -117,11 +137,11 @@ function fireTransition() {
     .ease(CONFIG.transitionEase)
     .call(zoom.transform, dest);
 
-  g.select('#overlay-image')
-    .transition()
-    .duration(CONFIG.transitionDuration)
-    .ease(CONFIG.transitionEase)
-    .attr('opacity', 1);
+  setTimeout(() => {  
+  document.getElementById('overlay-image').style.opacity = '1';
+  }, CONFIG.transitionDelay);
 }
 
 document.getElementById('transitionBtn').addEventListener('click', fireTransition);
+
+} // end init
