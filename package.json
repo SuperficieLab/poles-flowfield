@@ -2,6 +2,7 @@
   "name": "poles-flowfield",
   "version": "1.0.0",
   "scripts": {
-    "start": "npx serve . --listen $PORT"
+    "start": "npx serve . --listen $PORT",
+    "dev": "npx serve . --listen 3000"
   }
 }

@@ -1,0 +1,170 @@
+body {
+  background: #000000;
+  overflow: hidden;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+}
+
+canvas {
+  display: block;
+  flex-shrink: 0;
+}
+
+#panel {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 22px;
+  background: rgba(6, 6, 10, 0.78);
+  border: 1px solid rgba(255, 224, 32, 0.18);
+  border-radius: 14px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 0 32px rgba(255, 224, 32, 0.06);
+  user-select: none;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+
+
+.btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 224, 32, 0.25);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 224, 32, 0.7);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.btn:hover {
+  background: rgba(255, 224, 32, 0.12);
+  color: #ffe020;
+}
+
+.btn.active {
+  background: rgba(255, 224, 32, 0.18);
+  color: #ffe020;
+}
+
+
+#hint {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 224, 32, 0.2);
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#hint.hidden {
+  opacity: 0;
+}
+
+#tooltip {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: rgba(255, 224, 32, 0.4);
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+
+#tooltip.hidden {
+  opacity: 0;
+}
+
+#sceneBar {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 100;
+  background: rgba(6, 6, 10, 0.72);
+  border: 1px solid rgba(255, 224, 32, 0.15);
+  border-radius: 20px;
+  padding: 6px 12px;
+  backdrop-filter: blur(12px);
+}
+
+.scene-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 224, 32, 0.2);
+  border-radius: 14px;
+  color: rgba(255, 224, 32, 0.55);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.scene-btn:hover {
+  background: rgba(255, 224, 32, 0.10);
+  color: #ffe020;
+  border-color: rgba(255, 224, 32, 0.4);
+}
+
+.scene-btn.active {
+  background: rgba(255, 224, 32, 0.18);
+  color: #ffe020;
+  border-color: rgba(255, 224, 32, 0.5);
+}
+
+.scene-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.top-sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 224, 32, 0.12);
+}
+
+.nav-link {
+  background: transparent;
+  border: 1px solid rgba(255, 224, 32, 0.15);
+  border-radius: 14px;
+  color: rgba(255, 224, 32, 0.35);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  cursor: pointer;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.nav-link:hover {
+  color: rgba(255, 224, 32, 0.7);
+  border-color: rgba(255, 224, 32, 0.4);
+}
