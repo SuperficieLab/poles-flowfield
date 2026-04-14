@@ -5,7 +5,7 @@ const CONFIG = {
   overlayImage: 'BASE_AFRICA.png',
 
   // Geographic target of the zoom animation [longitude, latitude].
-  zoomTarget: [5, -8],
+  zoomTarget: [5, -10],
 
   // How far in the camera zooms during the animation.
   zoomTargetScale: 2.5,
