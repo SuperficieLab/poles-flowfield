@@ -8,7 +8,7 @@ const CONFIG = {
   zoomTarget: [5, -10],
 
   // How far in the camera zooms during the animation.
-  zoomTargetScale: 2.5,
+  zoomTargetScale: 2.2,
 
   // Duration of the transition (camera move + crossfade), in ms.
   transitionDuration: 1250,
@@ -30,7 +30,7 @@ const CONFIG = {
   outlineColor:   'rgba(255,255,255,0.4)',
   outlineWidth:   1,
 
-  transitionDelay: 90, // ms to wait before starting the crossfade (after camera starts moving) 
+  transitionDelay: 380, // ms to wait before starting the crossfade (after camera starts moving) 
 };
 
 // ─── Preload images ──────────────────────────────────────────────────────────
