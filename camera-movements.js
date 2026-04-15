@@ -2,13 +2,13 @@
 
 const CONFIG = {
   bgImage:      'BASE_MUNDO.png',
-  overlayImage: 'BASE_AFRICA.png',
+  overlayImage: 'BASE-MUNDO - Contemporaneo Embedded.png',
 
   // Geographic target of the zoom animation [longitude, latitude].
-  zoomTarget: [5, -10],
+  zoomTarget: [4, -10],
 
   // How far in the camera zooms during the animation.
-  zoomTargetScale: 2.2,
+  zoomTargetScale: 2.1,
 
   // Duration of the transition (camera move + crossfade), in ms.
   transitionDuration: 1250,
@@ -30,7 +30,7 @@ const CONFIG = {
   outlineColor:   'rgba(255,255,255,0.4)',
   outlineWidth:   1,
 
-  transitionDelay: 380, // ms to wait before starting the crossfade (after camera starts moving) 
+  transitionDelay: 350, // ms to wait before starting the crossfade (after camera starts moving) 
 };
 
 // ─── Preload images ──────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ g.append('image')
   .attr('width', W).attr('height', H)
   .attr('preserveAspectRatio', 'xMidYMid meet')
   .style('will-change', 'opacity')
-  .style('opacity', '0')
+  .style('opacity', '0.5')
   .style('transition', `opacity ${CONFIG.transitionDuration}ms cubic-bezier(0.645, 0.045, 0.355, 1)`);
 
 // ─── Zoom ────────────────────────────────────────────────────────────────────
