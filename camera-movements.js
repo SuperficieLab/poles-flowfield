@@ -74,27 +74,22 @@ svg.append('defs')
   .attr('d', spherePath);
 
 // ─── Images ──────────────────────────────────────────────────────────────────
-const [[x0, y0], [x1, y1]] = path.bounds({ type: 'Sphere' });
-const imgW = x1 - x0;
-const imgH = y1 - y0;
 
 g.append('image')
   .attr('id', 'bg-image')
-  .attr('clip-path', 'url(#sphere-clip)')
   .attr('href', CONFIG.bgImage)
-  .attr('x', x0).attr('y', y0)
-  .attr('width', imgW).attr('height', imgH)
-  .attr('preserveAspectRatio', 'none');
+  .attr('x', 0).attr('y', 0)
+  .attr('width', W).attr('height', H)
+  .attr('preserveAspectRatio', 'xMidYMid meet');
 
 // Second image — same size/position as base, starts invisible.
 // CSS transition (not D3 attr) so the crossfade runs on the compositor thread.
 g.append('image')
   .attr('id', 'overlay-image')
-  .attr('clip-path', 'url(#sphere-clip)')
   .attr('href', CONFIG.overlayImage)
-  .attr('x', x0).attr('y', y0)
-  .attr('width', imgW).attr('height', imgH)
-  .attr('preserveAspectRatio', 'none')
+  .attr('x', 0).attr('y', 0)
+  .attr('width', W).attr('height', H)
+  .attr('preserveAspectRatio', 'xMidYMid meet')
   .style('will-change', 'opacity')
   .style('opacity', '0')
   .style('transition', `opacity ${CONFIG.transitionDuration}ms cubic-bezier(0.645, 0.045, 0.355, 1)`);
