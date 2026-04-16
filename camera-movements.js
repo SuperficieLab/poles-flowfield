@@ -1,14 +1,14 @@
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  bgImage:      'BASE_MUNDO.png',
-  overlayImage: 'map-10_img-base.png',
+  bgImage:      'BASE-MUNDO AFRICA 8 K.png',
+  overlayImage: 'BASE-MUNDO AFRICA - MAPA 10 8K.png',
 
   // Geographic target of the zoom animation [longitude, latitude].
-  zoomTarget: [0, -9],
+  zoomTarget: [0, -10],
 
   // How far in the camera zooms during the animation.
-  zoomTargetScale: 2,
+  zoomTargetScale: 2.3,
 
   // Duration of the transition (camera move + crossfade), in ms.
   transitionDuration: 1250,
@@ -22,7 +22,7 @@ const CONFIG = {
 
   // Enable scroll-wheel zoom. zoomMin/zoomMax clamp the range.
   scrollZoomEnabled: true,
-  zoomMin: 2.1,
+  zoomMin: 2.3,
   zoomInitial: 1,
   zoomMax: 3.5,
 
@@ -32,7 +32,7 @@ const CONFIG = {
   outlineColor:   'rgba(255,255,255,0.4)',
   outlineWidth:   1,
 
-  transitionDelay: 350, // ms to wait before starting the crossfade (after camera starts moving) 
+  transitionDelay: 500, // ms to wait before starting the crossfade (after camera starts moving) 
 };
 
 // ─── Preload images ──────────────────────────────────────────────────────────
