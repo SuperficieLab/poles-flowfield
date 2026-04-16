@@ -1,64 +1,54 @@
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  bgTiles:      'tiles/bg',
-  overlayTiles: 'tiles/overlay',
-  tileCols:   3,
-  tileRows:   2,
-  tileWidth:  4096,
-  tileHeight: 3456,
+  bgImage:      'BASE-MUNDO AFRICA 8 K.png',
+  overlayImage: 'BASE-MUNDO AFRICA - MAPA 10 8K.png',
 
-  // Geographic target of the zoom animation [longitude, latitude].
-  zoomTarget: [0, -10],
+  zoomTarget:      [0, -940000], // Eckert III metres — roughly [0°, -10°]
+  zoomTargetScale: 1.5,
 
-  // How far in the camera zooms during the animation.
-  zoomTargetScale: 2.3,
+  transitionDuration: 1500,
+  transitionEasing:  'cubic-bezier(0.645, 0.045, 0.355, 1)', // cinematic
 
-  // Duration of the transition (camera move + crossfade), in ms.
-  transitionDuration: 1250,
-
-  // Easing curve:
-  // d3.easeCubicInOut  — slow start, fast middle, slow end (cinematic)
-  // d3.easeLinear      — constant speed
-  // d3.easeExpInOut    — very slow start/end, aggressive middle
-  // d3.easeBackInOut   — slight overshoot at both ends
-  transitionEase: d3.easeCubicInOut,
-
-  // Enable scroll-wheel zoom. zoomMin/zoomMax clamp the range.
   scrollZoomEnabled: true,
-  zoomMin: 2.3,
+  zoomMin:     2.3,
   zoomInitial: 1,
-  zoomMax: 8,
+  zoomMax:     8,
 
-  // Graticule + outline styles.
-  graticuleColor: 'rgba(255,255,255,0.15)',
-  graticuleWidth: 0.5,
-  outlineColor:   'rgba(255,255,255,0.4)',
-  outlineWidth:   1,
-
-  transitionDelay: 500,
+  crossfadeDuration: 1000,
+  crossfadeOverlap:  1000,
 };
 
-// ─── Build tile list ─────────────────────────────────────────────────────────
+const CROSSFADE = `opacity ${CONFIG.crossfadeDuration}ms cubic-bezier(0.645, 0.045, 0.355, 1)`;
 
-function makeTiles(dir, cols, rows) {
-  const tiles = [];
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      tiles.push({ src: `${dir}/tile_${row}_${col}.png`, row, col });
-    }
-  }
-  return tiles;
+// ─── Extents in Eckert III projected metres (raw from SHP files) ─────────────
+
+const GLOBAL = { xmin: -16921197.759, xmax: 16921200.822, ymin: -8460599.396, ymax: 8460601.462 };
+const AFRICA = { xmin:  -8509252.682, xmax:  8509255.745, ymin: -5592144.858, ymax: 3980766.133 };
+
+// ─── Preload images ──────────────────────────────────────────────────────────
+
+async function preloadImage(src) {
+  const img = new Image();
+  img.src = src;
+  await img.decode();
+  return { src, w: img.naturalWidth, h: img.naturalHeight };
 }
 
-const TW = CONFIG.tileWidth;
-const TH = CONFIG.tileHeight;
-const bgTiles      = makeTiles(CONFIG.bgTiles,      CONFIG.tileCols, CONFIG.tileRows);
-const overlayTiles = makeTiles(CONFIG.overlayTiles, CONFIG.tileCols, CONFIG.tileRows);
+async function load() {
+  const [[bg], raisg] = await Promise.all([
+    Promise.all([
+      preloadImage(CONFIG.bgImage),
+      preloadImage(CONFIG.overlayImage),
+    ]),
+    fetch('raisg-lim.geojson').then(r => r.json()),
+  ]);
+  init(bg.w, bg.h, raisg);
+}
 
-init(TW * CONFIG.tileCols, TH * CONFIG.tileRows, bgTiles, overlayTiles, TW, TH);
+load().catch(console.error);
 
-function init(IW, IH, bgTiles, overlayTiles, TW, TH) {
+function init(IW, IH, raisg) {
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -68,58 +58,96 @@ const H = window.innerHeight;
 
 svg.attr('viewBox', `0 0 ${W} ${H}`).attr('preserveAspectRatio', 'xMidYMid meet');
 
-const projection = d3.geoEckert3()
-  .fitSize([IW, IH], { type: 'Sphere' });
 
-const path = d3.geoPath().projection(projection);
+// ─── Overlay position — direct linear mapping from Eckert III metres to pixels ─
+
+const gW = GLOBAL.xmax - GLOBAL.xmin;
+const gH = GLOBAL.ymax - GLOBAL.ymin;
+
+const ox = (AFRICA.xmin - GLOBAL.xmin) / gW * IW;
+const oy = (GLOBAL.ymax - AFRICA.ymax) / gH * IH;
+const ow = (AFRICA.xmax - AFRICA.xmin) / gW * IW;
+const oh = (AFRICA.ymax - AFRICA.ymin) / gH * IH;
 
 // ─── Root group ──────────────────────────────────────────────────────────────
-const g = svg.append('g').attr('id', 'root');
 
-// ─── Sphere clip ─────────────────────────────────────────────────────────────
-const spherePath = path({ type: 'Sphere' });
-
-svg.append('defs')
-  .append('clipPath')
-  .attr('id', 'sphere-clip')
-  .append('path')
-  .attr('d', spherePath);
-
-// ─── Tile helpers ────────────────────────────────────────────────────────────
-
-function appendTiles(tiles, extraStyle = {}) {
-  tiles.forEach(({ src, row, col }) => {
-    const el = g.append('image')
-      .attr('href', src)
-      .attr('x', col * TW).attr('y', row * TH)
-      .attr('width', TW + 1).attr('height', TH + 1)
-      .style('image-rendering', 'high-quality');
-    Object.entries(extraStyle).forEach(([k, v]) => el.style(k, v));
-  });
-}
+const g = svg.append('g').attr('id', 'root')
+  .style('will-change', 'transform')
+  .style('transform-origin', '0 0');
 
 // ─── Images ──────────────────────────────────────────────────────────────────
 
-appendTiles(bgTiles);
+g.append('image')
+  .attr('id', 'bg-image')
+  .attr('href', CONFIG.bgImage)
+  .attr('x', 0).attr('y', 0)
+  .attr('width', IW).attr('height', IH)
+  .style('image-rendering', 'high-quality');
 
-appendTiles(overlayTiles, {
-  'will-change': 'opacity',
-  'opacity': '0',
-  'transition': `opacity ${CONFIG.transitionDuration}ms cubic-bezier(0.645, 0.045, 0.355, 1)`,
+g.append('image')
+  .attr('id', 'overlay-image')
+  .attr('href', CONFIG.overlayImage)
+  .attr('x', ox).attr('y', oy)
+  .attr('width', ow).attr('height', oh)
+  .attr('preserveAspectRatio', 'none')
+  .style('image-rendering', 'high-quality')
+  .style('will-change', 'opacity')
+  .style('opacity', '0')
+  .style('transition', CROSSFADE);
+
+// ─── Extents debug ───────────────────────────────────────────────────────────
+
+g.append('rect')
+  .attr('x', 0).attr('y', 0).attr('width', IW).attr('height', IH)
+  .attr('fill', 'none').attr('stroke', 'cyan').attr('stroke-width', 4);
+
+g.append('rect')
+  .attr('x', ox).attr('y', oy).attr('width', ow).attr('height', oh)
+  .attr('fill', 'none').attr('stroke', 'yellow').attr('stroke-width', 4);
+
+// ─── Data layers ─────────────────────────────────────────────────────────────
+
+const bgDataLayer = g.append('g').attr('id', 'bg-data');
+
+const overlayDataLayer = g.append('g').attr('id', 'overlay-data')
+  .style('opacity', '0')
+  .style('transition', CROSSFADE);
+
+const eck3ToPixel = d3.geoTransform({
+  point(x, y) {
+    this.stream.point(
+      (x - GLOBAL.xmin) / gW * IW,
+      (GLOBAL.ymax - y) / gH * IH
+    );
+  }
 });
+const path = d3.geoPath(eck3ToPixel);
+
+function drawRaisg(layer, color) {
+  layer.append('path')
+    .datum(raisg)
+    .attr('d', path)
+    .attr('fill', 'none')
+    .attr('stroke', color)
+    .attr('stroke-width', 3);
+}
+
+drawRaisg(bgDataLayer,      '#ff3300');
+drawRaisg(overlayDataLayer, '#ff3300');
 
 // ─── Zoom ────────────────────────────────────────────────────────────────────
-let scrollZoomActive = true;
 
+let scrollZoomActive = true;
 const fitScale = Math.min(W / IW, H / IH);
 
 const zoom = d3.zoom()
   .extent([[0, 0], [W, H]])
   .scaleExtent([CONFIG.zoomMin * fitScale, CONFIG.zoomMax * fitScale])
-  .filter((event) => CONFIG.scrollZoomEnabled && scrollZoomActive && event.type === 'wheel')
-  .on('zoom', (event) => {
-    g.attr('transform', event.transform);
-    document.getElementById('zoomReadout').textContent = `z ${(event.transform.k / fitScale).toFixed(2)}`;
+  .filter(event => CONFIG.scrollZoomEnabled && scrollZoomActive && event.type === 'wheel')
+  .on('zoom', event => {
+    const { x, y, k } = event.transform;
+    g.style('transform', `translate(${x}px,${y}px) scale(${k})`);
+    document.getElementById('zoomReadout').textContent = `z ${(k / fitScale).toFixed(2)}`;
   });
 
 svg.call(zoom);
@@ -129,11 +157,11 @@ const initialTransform = d3.zoomIdentity
   .scale(fitScale * CONFIG.zoomInitial);
 zoom.transform(svg, initialTransform);
 
-if (!CONFIG.scrollZoomEnabled) {
-  window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
-}
+if (!CONFIG.scrollZoomEnabled)
+  window.addEventListener('wheel', e => e.preventDefault(), { passive: false });
 
 // ─── Transition ──────────────────────────────────────────────────────────────
+
 let triggered = false;
 
 function fireTransition() {
@@ -142,26 +170,39 @@ function fireTransition() {
 
   document.getElementById('transitionBtn').classList.add('active');
 
-  const [tx, ty] = projection(CONFIG.zoomTarget);
+  const [mx, my] = CONFIG.zoomTarget;
+  const tx = (mx - GLOBAL.xmin) / gW * IW;
+  const ty = (GLOBAL.ymax - my) / gH * IH;
+  const bg      = document.getElementById('bg-image');
+  const overlay = document.getElementById('overlay-image');
 
-  const dest = d3.zoomIdentity
-    .translate(W / 2, H / 2)
-    .scale(CONFIG.zoomTargetScale * fitScale)
-    .translate(-tx, -ty);
+  // CSS transition on the group — zero JS per frame, full GPU compositing.
+  const easing = CONFIG.transitionEasing;
+  const k = CONFIG.zoomTargetScale * fitScale;
+  const x = W / 2 - tx * k;
+  const y = H / 2 - ty * k;
 
-  svg.transition()
-    .duration(CONFIG.transitionDuration)
-    .ease(CONFIG.transitionEase)
-    .call(zoom.transform, dest)
-    .on('end', () => { scrollZoomActive = true; });
+  g.style('transition', `transform ${CONFIG.transitionDuration}ms ${easing}`);
+  g.style('transform',  `translate(${x}px,${y}px) scale(${k})`);
+
+  // Sync D3 zoom state after animation so scroll zoom works correctly.
+  g.node().addEventListener('transitionend', () => {
+    g.style('transition', null);
+    zoom.transform(svg, d3.zoomIdentity.translate(x, y).scale(k));
+    scrollZoomActive = true;
+  }, { once: true });
+
+  bg.style.transition      = CROSSFADE;
+  overlay.style.transition = CROSSFADE;
 
   setTimeout(() => {
-    const allImages = g.selectAll('image').nodes();
-    const overlayCount = CONFIG.tileCols * CONFIG.tileRows;
-    allImages.slice(-overlayCount).forEach(el => { el.style.opacity = '1'; });
-  }, CONFIG.transitionDelay);
+    overlay.style.opacity = '1';
+    bg.style.opacity      = '0';
+    overlayDataLayer.style('opacity', '1');
+    bgDataLayer.style('opacity', '0');
+  }, CONFIG.transitionDuration - CONFIG.crossfadeOverlap);
 }
 
 document.getElementById('transitionBtn').addEventListener('click', fireTransition);
 
-} // end init
+}
