@@ -1,8 +1,12 @@
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  bgImage:      'BASE-MUNDO AFRICA 8 K.png',
-  overlayImage: 'BASE-MUNDO AFRICA - MAPA 10 8K.png',
+  bgTiles:      'tiles/bg',
+  overlayTiles: 'tiles/overlay',
+  tileCols:   3,
+  tileRows:   2,
+  tileWidth:  4096,
+  tileHeight: 3456,
 
   // Geographic target of the zoom animation [longitude, latitude].
   zoomTarget: [0, -10],
@@ -32,23 +36,29 @@ const CONFIG = {
   outlineColor:   'rgba(255,255,255,0.4)',
   outlineWidth:   1,
 
-  transitionDelay: 500, // ms to wait before starting the crossfade (after camera starts moving) 
+  transitionDelay: 500,
 };
 
-// ─── Preload images ──────────────────────────────────────────────────────────
+// ─── Build tile list ─────────────────────────────────────────────────────────
 
-function preloadImage(src) {
-  const img = new Image();
-  img.src = src;
-  return img.decode().then(() => ({ src, w: img.naturalWidth, h: img.naturalHeight }));
+function makeTiles(dir, cols, rows) {
+  const tiles = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      tiles.push({ src: `${dir}/tile_${row}_${col}.png`, row, col });
+    }
+  }
+  return tiles;
 }
 
-Promise.all([
-  preloadImage(CONFIG.bgImage),
-  preloadImage(CONFIG.overlayImage),
-]).then(([bg]) => init(bg.w, bg.h)).catch(console.error);
+const TW = CONFIG.tileWidth;
+const TH = CONFIG.tileHeight;
+const bgTiles      = makeTiles(CONFIG.bgTiles,      CONFIG.tileCols, CONFIG.tileRows);
+const overlayTiles = makeTiles(CONFIG.overlayTiles, CONFIG.tileCols, CONFIG.tileRows);
 
-function init(IW, IH) {
+init(TW * CONFIG.tileCols, TH * CONFIG.tileRows, bgTiles, overlayTiles, TW, TH);
+
+function init(IW, IH, bgTiles, overlayTiles, TW, TH) {
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -58,8 +68,6 @@ const H = window.innerHeight;
 
 svg.attr('viewBox', `0 0 ${W} ${H}`).attr('preserveAspectRatio', 'xMidYMid meet');
 
-// Projection is fitted to the full image resolution so zoom-to-point
-// coordinates stay aligned with the actual pixels in the source file.
 const projection = d3.geoEckert3()
   .fitSize([IW, IH], { type: 'Sphere' });
 
@@ -77,35 +85,32 @@ svg.append('defs')
   .append('path')
   .attr('d', spherePath);
 
+// ─── Tile helpers ────────────────────────────────────────────────────────────
+
+function appendTiles(tiles, extraStyle = {}) {
+  tiles.forEach(({ src, row, col }) => {
+    const el = g.append('image')
+      .attr('href', src)
+      .attr('x', col * TW).attr('y', row * TH)
+      .attr('width', TW).attr('height', TH)
+      .style('image-rendering', 'high-quality');
+    Object.entries(extraStyle).forEach(([k, v]) => el.style(k, v));
+  });
+}
+
 // ─── Images ──────────────────────────────────────────────────────────────────
 
-g.append('image')
-  .attr('id', 'bg-image')
-  .attr('href', CONFIG.bgImage)
-  .attr('x', 0).attr('y', 0)
-  .attr('width', IW).attr('height', IH)
-  .attr('preserveAspectRatio', 'xMidYMid meet')
-  .style('image-rendering', 'high-quality');
+appendTiles(bgTiles);
 
-// Second image — same size/position as base, starts invisible.
-// CSS transition (not D3 attr) so the crossfade runs on the compositor thread.
-g.append('image')
-  .attr('id', 'overlay-image')
-  .attr('href', CONFIG.overlayImage)
-  .attr('x', 0).attr('y', 0)
-  .attr('width', IW).attr('height', IH)
-  .attr('preserveAspectRatio', 'xMidYMid meet')
-  .style('image-rendering', 'high-quality')
-  .style('will-change', 'opacity')
-  .style('opacity', '0')
-  .style('transition', `opacity ${CONFIG.transitionDuration}ms cubic-bezier(0.645, 0.045, 0.355, 1)`);
+appendTiles(overlayTiles, {
+  'will-change': 'opacity',
+  'opacity': '0',
+  'transition': `opacity ${CONFIG.transitionDuration}ms cubic-bezier(0.645, 0.045, 0.355, 1)`,
+});
 
 // ─── Zoom ────────────────────────────────────────────────────────────────────
-// Scroll wheel allowed when scrollZoomEnabled; drag/pinch always blocked.
-// filter(() => false) still lets programmatic zoom.transform calls through.
 let scrollZoomActive = true;
 
-// Scale that fits the full image into the viewport.
 const fitScale = Math.min(W / IW, H / IH);
 
 const zoom = d3.zoom()
@@ -119,20 +124,16 @@ const zoom = d3.zoom()
 
 svg.call(zoom);
 
-// Initial transform: scale image down to viewport, centered.
 const initialTransform = d3.zoomIdentity
   .translate((W - IW * fitScale) / 2, (H - IH * fitScale) / 2)
   .scale(fitScale * CONFIG.zoomInitial);
 zoom.transform(svg, initialTransform);
 
-// Only suppress browser-native wheel zoom when scroll zoom is disabled.
 if (!CONFIG.scrollZoomEnabled) {
   window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
 }
 
 // ─── Transition ──────────────────────────────────────────────────────────────
-// Fired by the button. Animates the camera toward zoomTarget and fades in
-// the overlay simultaneously. One-shot — button disables itself after firing.
 let triggered = false;
 
 function fireTransition() {
@@ -143,7 +144,6 @@ function fireTransition() {
 
   const [tx, ty] = projection(CONFIG.zoomTarget);
 
-  // Zoom-to-point: place target at viewport center, then scale up.
   const dest = d3.zoomIdentity
     .translate(W / 2, H / 2)
     .scale(CONFIG.zoomTargetScale * fitScale)
@@ -156,9 +156,10 @@ function fireTransition() {
     .on('end', () => { scrollZoomActive = true; });
 
   setTimeout(() => {
-    document.getElementById('overlay-image').style.opacity = '1';
+    const allImages = g.selectAll('image').nodes();
+    const overlayCount = CONFIG.tileCols * CONFIG.tileRows;
+    allImages.slice(-overlayCount).forEach(el => { el.style.opacity = '1'; });
   }, CONFIG.transitionDelay);
-
 }
 
 document.getElementById('transitionBtn').addEventListener('click', fireTransition);
