@@ -24,7 +24,7 @@ const CONFIG = {
   scrollZoomEnabled: true,
   zoomMin: 2.3,
   zoomInitial: 1,
-  zoomMax: 3.5,
+  zoomMax: 8,
 
   // Graticule + outline styles.
   graticuleColor: 'rgba(255,255,255,0.15)',
@@ -114,6 +114,7 @@ const zoom = d3.zoom()
   .filter((event) => CONFIG.scrollZoomEnabled && scrollZoomActive && event.type === 'wheel')
   .on('zoom', (event) => {
     g.attr('transform', event.transform);
+    document.getElementById('zoomReadout').textContent = `z ${(event.transform.k / fitScale).toFixed(2)}`;
   });
 
 svg.call(zoom);
