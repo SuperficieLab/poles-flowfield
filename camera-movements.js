@@ -2,13 +2,13 @@
 
 const CONFIG = {
   bgImage:      'BASE_MUNDO.png',
-  overlayImage: 'BASE-MUNDO - Contemporaneo Embedded.png',
+  overlayImage: 'map-10_img-base.png',
 
   // Geographic target of the zoom animation [longitude, latitude].
-  zoomTarget: [4, -10],
+  zoomTarget: [0, -9],
 
   // How far in the camera zooms during the animation.
-  zoomTargetScale: 2.1,
+  zoomTargetScale: 2,
 
   // Duration of the transition (camera move + crossfade), in ms.
   transitionDuration: 1250,
@@ -20,9 +20,11 @@ const CONFIG = {
   // d3.easeBackInOut   — slight overshoot at both ends
   transitionEase: d3.easeCubicInOut,
 
-  // Zoom limits for manual scroll/drag.
-  zoomMin: 1,
-  zoomMax: 1.4,
+  // Enable scroll-wheel zoom. zoomMin/zoomMax clamp the range.
+  scrollZoomEnabled: true,
+  zoomMin: 2.1,
+  zoomInitial: 1,
+  zoomMax: 3.5,
 
   // Graticule + outline styles.
   graticuleColor: 'rgba(255,255,255,0.15)',
@@ -38,15 +40,15 @@ const CONFIG = {
 function preloadImage(src) {
   const img = new Image();
   img.src = src;
-  return img.decode().then(() => src);
+  return img.decode().then(() => ({ src, w: img.naturalWidth, h: img.naturalHeight }));
 }
 
 Promise.all([
   preloadImage(CONFIG.bgImage),
   preloadImage(CONFIG.overlayImage),
-]).then(init).catch(console.error);
+]).then(([bg]) => init(bg.w, bg.h)).catch(console.error);
 
-function init() {
+function init(IW, IH) {
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
@@ -56,8 +58,10 @@ const H = window.innerHeight;
 
 svg.attr('viewBox', `0 0 ${W} ${H}`).attr('preserveAspectRatio', 'xMidYMid meet');
 
+// Projection is fitted to the full image resolution so zoom-to-point
+// coordinates stay aligned with the actual pixels in the source file.
 const projection = d3.geoEckert3()
-  .fitSize([W, H], { type: 'Sphere' });
+  .fitSize([IW, IH], { type: 'Sphere' });
 
 const path = d3.geoPath().projection(projection);
 
@@ -79,8 +83,9 @@ g.append('image')
   .attr('id', 'bg-image')
   .attr('href', CONFIG.bgImage)
   .attr('x', 0).attr('y', 0)
-  .attr('width', W).attr('height', H)
-  .attr('preserveAspectRatio', 'xMidYMid meet');
+  .attr('width', IW).attr('height', IH)
+  .attr('preserveAspectRatio', 'xMidYMid meet')
+  .style('image-rendering', 'high-quality');
 
 // Second image — same size/position as base, starts invisible.
 // CSS transition (not D3 attr) so the crossfade runs on the compositor thread.
@@ -88,25 +93,41 @@ g.append('image')
   .attr('id', 'overlay-image')
   .attr('href', CONFIG.overlayImage)
   .attr('x', 0).attr('y', 0)
-  .attr('width', W).attr('height', H)
+  .attr('width', IW).attr('height', IH)
   .attr('preserveAspectRatio', 'xMidYMid meet')
+  .style('image-rendering', 'high-quality')
   .style('will-change', 'opacity')
-  .style('opacity', '0.5')
+  .style('opacity', '0')
   .style('transition', `opacity ${CONFIG.transitionDuration}ms cubic-bezier(0.645, 0.045, 0.355, 1)`);
 
 // ─── Zoom ────────────────────────────────────────────────────────────────────
-// filter(() => false) blocks all user interaction (scroll, drag, pinch) while
-// still allowing programmatic calls like zoom.transform inside fireTransition.
+// Scroll wheel allowed when scrollZoomEnabled; drag/pinch always blocked.
+// filter(() => false) still lets programmatic zoom.transform calls through.
+let scrollZoomActive = true;
+
+// Scale that fits the full image into the viewport.
+const fitScale = Math.min(W / IW, H / IH);
+
 const zoom = d3.zoom()
-  .filter(() => false)
+  .extent([[0, 0], [W, H]])
+  .scaleExtent([CONFIG.zoomMin * fitScale, CONFIG.zoomMax * fitScale])
+  .filter((event) => CONFIG.scrollZoomEnabled && scrollZoomActive && event.type === 'wheel')
   .on('zoom', (event) => {
     g.attr('transform', event.transform);
   });
 
 svg.call(zoom);
 
-// Block browser-level pinch zoom and ctrl+scroll zoom.
-window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+// Initial transform: scale image down to viewport, centered.
+const initialTransform = d3.zoomIdentity
+  .translate((W - IW * fitScale) / 2, (H - IH * fitScale) / 2)
+  .scale(fitScale * CONFIG.zoomInitial);
+zoom.transform(svg, initialTransform);
+
+// Only suppress browser-native wheel zoom when scroll zoom is disabled.
+if (!CONFIG.scrollZoomEnabled) {
+  window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+}
 
 // ─── Transition ──────────────────────────────────────────────────────────────
 // Fired by the button. Animates the camera toward zoomTarget and fades in
@@ -124,17 +145,19 @@ function fireTransition() {
   // Zoom-to-point: place target at viewport center, then scale up.
   const dest = d3.zoomIdentity
     .translate(W / 2, H / 2)
-    .scale(CONFIG.zoomTargetScale)
+    .scale(CONFIG.zoomTargetScale * fitScale)
     .translate(-tx, -ty);
 
   svg.transition()
     .duration(CONFIG.transitionDuration)
     .ease(CONFIG.transitionEase)
-    .call(zoom.transform, dest);
+    .call(zoom.transform, dest)
+    .on('end', () => { scrollZoomActive = true; });
 
-  setTimeout(() => {  
-  document.getElementById('overlay-image').style.opacity = '1';
+  setTimeout(() => {
+    document.getElementById('overlay-image').style.opacity = '1';
   }, CONFIG.transitionDelay);
+
 }
 
 document.getElementById('transitionBtn').addEventListener('click', fireTransition);
