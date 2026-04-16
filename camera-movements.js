@@ -92,7 +92,7 @@ function appendTiles(tiles, extraStyle = {}) {
     const el = g.append('image')
       .attr('href', src)
       .attr('x', col * TW).attr('y', row * TH)
-      .attr('width', TW).attr('height', TH)
+      .attr('width', TW + 1).attr('height', TH + 1)
       .style('image-rendering', 'high-quality');
     Object.entries(extraStyle).forEach(([k, v]) => el.style(k, v));
   });
